@@ -1,0 +1,174 @@
+/* src/styles/globals.css - updated layout & responsive fixes */
+
+/* --- Color tokens & basic reset --- */
+:root{
+  --bg: #f7fafc;
+  --card: #ffffff;
+  --muted: #6b7280;
+  --accent: #2563eb;
+  --accent-2: #7c3aed;
+  --success: #10b981;
+  --shadow-lg: 0 18px 50px rgba(15,23,42,0.06);
+  --shadow-md: 0 8px 28px rgba(15,23,42,0.04);
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+html,body,#root,#__next { height: 100%; }
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: linear-gradient(180deg, #fbfdff 0%, var(--bg) 100%);
+  color: #081124;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- Hero / CTA --- */
+.hero-card {
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(124,58,237,0.06), rgba(37,99,235,0.04));
+  padding: 28px;
+  box-shadow: var(--shadow-md);
+}
+.hero-content {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap: 16px;
+}
+.hero-title { margin: 0; font-weight: 700; color: var(--accent-2); line-height:1; }
+.hero-sub { display:block; margin-top:6px; color: var(--muted); }
+.primary-cta {
+  background: linear-gradient(90deg, #7c3aed, #2563eb);
+  color: #fff;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(37,99,235,0.12);
+}
+.primary-cta:hover { transform: translateY(-2px); transition: transform .15s ease; }
+
+/* --- Panel cards --- */
+.panel-card {
+  border-radius: var(--radius);
+  background: var(--card);
+  padding: 18px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid rgba(15,23,42,0.03);
+}
+.panel-card.large {
+  min-height: 640px;
+  display:flex;
+  flex-direction:column;
+  gap: 12px;
+  overflow: hidden; /* ensure inner scroll doesn't push layout */
+}
+
+/* --- Chat container --- */
+.chat-container {
+  width: 100%;
+  height: 540px;                  /* fixed, reasonable height so right rail can align */
+  overflow-y: auto;
+  padding: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(15,23,42,0.03);
+}
+
+/* ensure inner messages don't overflow horizontally */
+.chat-message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* center empty-state */
+.empty-chat { color: var(--muted); padding: 48px; text-align:center; }
+
+/* --- Chat bubbles --- */
+.chat-row { display:flex; gap: 12px; align-items:flex-start; margin-bottom:14px; }
+/* left (interviewer) */
+.bubble-left {
+  background: white;
+  border: 1px solid rgba(15,23,42,0.04);
+  padding: 14px;
+  border-radius: 12px;
+  max-width: calc(100% - 110px);
+  box-shadow: 0 6px 16px rgba(2,6,23,0.03);
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+/* right (candidate) */
+.bubble-right {
+  background: linear-gradient(90deg, rgba(124,58,237,0.06), rgba(37,99,235,0.04));
+  padding: 14px;
+  border-radius: 12px;
+  max-width: calc(100% - 110px);
+  box-shadow: 0 8px 18px rgba(37,99,235,0.06);
+  align-self: flex-end;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+/* small author label row */
+.chat-author { font-weight:700; display:flex; gap:8px; align-items:center; }
+
+/* --- Right panel (controls) --- */
+.right-rail {
+  width: 360px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+@media (max-width: 1100px) {
+  .right-rail { width: 320px; }
+  .panel-card.large { min-height: 520px; }
+  .chat-container { height: 420px; }
+}
+@media (max-width: 900px) {
+  .right-rail { width: 100%; }
+  .panel-card.large { min-height: 440px; }
+  .chat-container { height: 360px; }
+}
+
+/* --- Candidate cards (dashboard) --- */
+.candidate-card {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  align-items: flex-start;
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid rgba(15,23,42,0.03);
+  background: var(--card);
+}
+/* left avatar block */
+.candidate-card .avatar-block {
+  min-width: 72px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+/* content column */
+.candidate-card .candidate-content { flex: 1; display:flex; flex-direction:column; gap:12px; }
+/* right score block */
+.candidate-card .score-block { min-width: 140px; text-align:center; }
+
+/* candidate subtext */
+.candidate-sub { color: var(--muted); font-size: 13px; }
+
+/* cards should wrap nicely on small screens */
+@media (max-width: 900px) {
+  .candidate-card { flex-direction: column; align-items: stretch; }
+  .candidate-card .score-block { min-width: auto; align-self: flex-end; }
+}
+
+/* --- Inputs/buttons polish (Ant overrides) --- */
+.ant-btn { border-radius: 10px; }
+.ant-card { border-radius: 12px; }
+.ant-input, .ant-select-selector, .ant-input-textarea { border-radius: 8px; }
