@@ -1,10 +1,12 @@
-# AI-Powered Interview Assistant
+# RecruitAI : AI-Powered Interview Assistant
 
 This project is an AI-powered interview assistant designed to streamline the interview process for both interviewers and candidates. It includes features for resume upload and parsing, an interview chat interface with timers and auto-submit functionality, an interviewer dashboard, and persistence using Redux Toolkit and redux-persist.
 
 ## Features
 
 - **Resume Upload and Parsing**: Candidates can upload their resumes in PDF or DOCX format. The application extracts contact information and adds candidates to the system.
+- **Disable Copy / Paste**: In chat interface for interviewees, copy paste option is disabled
+- **Full-Screen Mode**: Once they start the test, the screen goes to full screen mode until the test is submitted, to prevent switching tabs.
 - **Interview Chat**: A chat interface for interviewees to answer questions in real-time, with a countdown timer for each question.
 - **Timer Functionality**: Each question has a timer that automatically submits the answer when time runs out.
 - **Interviewer Dashboard**: A dashboard for interviewers to view candidates, their scores, and detailed chat histories.
