@@ -1,11 +1,12 @@
-// src/utils/resumeParser.js
+// src/utils/resumeParser.js — browser-side text extraction from PDF / DOCX.
+import { analyzeResume } from "../lib/resumeHeuristics";
+
 let pdfjsLib = null;
 let mammoth = null;
 
 const loadPDFJS = async () => {
   if (!pdfjsLib) {
     pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
-    // best-effort worker path
     pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
   }
   return pdfjsLib;
@@ -16,46 +17,47 @@ const loadMammoth = async () => {
   return mammoth;
 };
 
-const emailRegex = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
-const phoneRegex = /(\+?\d[\d ()-]{7,}\d)/;
-
+/**
+ * Rebuild real lines from PDF text items using their y-position. Joining every item with a
+ * space (the old behaviour) collapsed a whole page into one line, which is why names were missed.
+ */
 export async function parsePDF(file) {
   const pdfjs = await loadPDFJS();
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-  let text = "";
+  const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pages = [];
   for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const t = await page.getTextContent();
-    text += t.items.map((it) => it.str).join(" ") + "\n";
+    const content = await (await pdf.getPage(i)).getTextContent();
+    const rows = [];
+    for (const it of content.items) {
+      if (!it.str || !it.str.trim()) continue;
+      const y = it.transform[5];
+      const x = it.transform[4];
+      let row = rows.find((r) => Math.abs(r.y - y) <= 3);
+      if (!row) rows.push((row = { y, items: [] }));
+      row.items.push({ x, str: it.str });
+    }
+    rows.sort((a, b) => b.y - a.y); // PDF y grows upward
+    pages.push(rows.map((r) => r.items.sort((a, b) => a.x - b.x).map((i) => i.str).join(" ").replace(/\s+/g, " ").trim()).join("\n"));
   }
-  return text;
+  return pages.join("\n");
 }
 
 export async function parseDocx(file) {
-  const mammothLib = await loadMammoth();
-  const arrayBuffer = await file.arrayBuffer();
-  const { value } = await mammothLib.extractRawText({ arrayBuffer });
+  const m = await loadMammoth();
+  const { value } = await m.extractRawText({ arrayBuffer: await file.arrayBuffer() });
   return value;
 }
 
+export async function extractTextFromFile(file) {
+  const n = file.name.toLowerCase();
+  if (n.endsWith(".pdf")) return parsePDF(file);
+  if (n.endsWith(".docx")) return parseDocx(file);
+  if (n.endsWith(".txt")) return file.text();
+  throw new Error("Unsupported file type. Please upload a PDF, DOCX or TXT resume.");
+}
+
+/** Kept for backwards compatibility. */
 export function extractContactInfo(text) {
-  const emailMatch = text.match(emailRegex);
-  const phoneMatch = text.match(phoneRegex);
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  let name = null;
-  for (let l of lines.slice(0, 8)) {
-    if (emailRegex.test(l) || phoneRegex.test(l)) continue;
-    if (/resume|curriculum|profile/i.test(l)) continue;
-    if (/^[A-Za-z ,.'-]{2,40}$/.test(l)) {
-      name = l;
-      break;
-    }
-  }
-  return {
-    name: name || null,
-    email: emailMatch ? emailMatch[0] : null,
-    phone: phoneMatch ? phoneMatch[0] : null,
-    text,
-  };
+  const p = analyzeResume(text);
+  return { name: p.name || null, email: p.email, phone: p.phone, text };
 }

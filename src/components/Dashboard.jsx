@@ -2,220 +2,96 @@
 "use client";
 
 import React, { useState } from "react";
-import { useSelector } from "react-redux";
-import { Table, Input, Card, Typography, Tag, Progress, Collapse, Empty } from "antd";
+import { useDispatch, useSelector } from "react-redux";
+import { Button, Card, Collapse, Empty, Input, Popconfirm, Progress, Table, Tag, Typography } from "antd";
+import { removeCandidate } from "../store/slices/candidatesSlice";
+import { scoreColor } from "./InterviewStudio";
 
-const { Title, Text } = Typography;
-const { Panel } = Collapse;
+const { Text, Paragraph } = Typography;
+const RECO_COLOR = { "Strong hire": "green", Hire: "blue", Borderline: "orange", "Not yet": "red", Incomplete: "default" };
 
-/**
- * Return highest numeric finalScore for a candidate or null
- */
-function highestScore(candidate) {
-  if (!candidate?.interviews?.length) return null;
-  const scores = candidate.interviews
-    .map((it) => (typeof it.finalScore === "number" ? Math.max(0, Math.min(100, it.finalScore)) : null))
-    .filter((s) => s !== null);
-  if (!scores.length) return null;
-  return Math.max(...scores);
-}
+const best = (c) => {
+  const s = (c.interviews || []).map((i) => i.finalScore).filter((n) => typeof n === "number");
+  return s.length ? Math.max(...s) : null;
+};
+const latest = (c) => (c.interviews || [])[(c.interviews || []).length - 1];
 
 export default function Dashboard() {
+  const dispatch = useDispatch();
   const candidates = useSelector((s) => s.candidates.list || []);
   const [search, setSearch] = useState("");
 
-  // prepare rows, compute topScore and filter/sort
+  const q = search.toLowerCase();
   const rows = candidates
-    .map((c) => ({ ...c, topScore: highestScore(c) }))
-    .filter(
-      (c) =>
-        (c.name || "").toLowerCase().includes(search.toLowerCase()) ||
-        (c.email || "").toLowerCase().includes(search.toLowerCase())
-    )
+    .map((c) => ({ ...c, topScore: best(c), last: latest(c) }))
+    .filter((c) => [c.name, c.email, ...(c.profile?.skills || [])].some((v) => (v || "").toLowerCase().includes(q)))
     .sort((a, b) => (b.topScore ?? -1) - (a.topScore ?? -1));
 
   const columns = [
     {
-      title: "Candidate",
-      dataIndex: "name",
-      key: "name",
-      render: (_, rec) => (
-        <div>
-          <div style={{ fontWeight: 700 }}>{rec.name}</div>
-          <div style={{ color: "#6b7280", fontSize: 12 }}>{rec.email}</div>
-        </div>
-      ),
+      title: "Candidate", key: "name",
+      render: (_, r) => (<div><b>{r.name || "Unnamed"}</b><div style={{ color: "#6b7280", fontSize: 12 }}>{r.email}</div></div>),
     },
+    { title: "Latest role", key: "role", render: (_, r) => r.last?.roleLabel || <Text type="secondary">—</Text> },
+    { title: "Verdict", key: "reco", render: (_, r) => r.last ? <Tag color={RECO_COLOR[r.last.recommendation]}>{r.last.recommendation}</Tag> : <Tag>No interview</Tag> },
+    { title: "Interviews", key: "n", render: (_, r) => (r.interviews || []).length },
     {
-      title: "Interviews",
-      dataIndex: "interviews",
-      key: "interviews",
-      render: (_, r) => <Text type="secondary">{(r.interviews || []).length}</Text>,
-    },
-    {
-      title: "Top score",
-      key: "top",
-      render: (_, r) => {
-        const s = r.topScore;
-        if (s === null || s === undefined) return <Tag>-</Tag>;
-        const capped = Math.max(0, Math.min(100, Math.round(s)));
-        return (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <div style={{ width: 140 }}>
-              <Progress percent={capped} size="small" showInfo={false} />
-            </div>
-            <div style={{ fontWeight: 700, marginTop: 6 }}>{capped} / 100</div>
-          </div>
-        );
-      },
+      title: "Best score", key: "top", sorter: (a, b) => (a.topScore ?? -1) - (b.topScore ?? -1),
+      render: (_, r) => (r.topScore === null ? <Tag>-</Tag> : <div style={{ width: 130 }}><Progress percent={r.topScore} size="small" strokeColor={scoreColor(r.topScore)} format={(p) => `${p}`} /></div>),
     },
   ];
 
-  return (
-    <div style={{ padding: 24 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>
-            Interviewer Dashboard
-          </Title>
-          <Text type="secondary">Candidates ordered by best performance (strict rubric).</Text>
-        </div>
-        <div>
-          <Input.Search
-            placeholder="Search candidates or email"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 360 }}
-            allowClear
-          />
-        </div>
-      </div>
+  const detail = (c) => (
+    <div style={{ padding: "4px 8px" }}>
+      <div style={{ color: "#6b7280", marginBottom: 6 }}>{c.email} {c.phone ? `• ${c.phone}` : ""} {c.profile?.yearsExperience != null ? `• ${c.profile.yearsExperience} yrs exp` : ""}</div>
+      <div style={{ marginBottom: 8 }}>{(c.profile?.skills || []).map((s) => <Tag key={s}>{s}</Tag>)}</div>
+      {c.profile?.summary && <Paragraph type="secondary">{c.profile.summary}</Paragraph>}
+      {!(c.interviews || []).length ? <Text type="secondary">No interviews yet.</Text> : (
+        <Collapse accordion items={[...c.interviews].reverse().map((it, idx) => ({
+          key: it.sessionId || idx,
+          label: (
+            <span>
+              {it.roleLabel || "Interview"} · <b style={{ color: scoreColor(it.finalScore) }}>{it.finalScore}/100</b>{" "}
+              <Tag color={RECO_COLOR[it.recommendation]}>{it.recommendation}</Tag>
+              <Text type="secondary">{it.date ? new Date(it.date).toLocaleString() : ""}</Text>
+              {it.tabSwitches > 0 && <Tag color="red" style={{ marginLeft: 6 }}>{it.tabSwitches} tab switches</Tag>}
+            </span>
+          ),
+          children: (
+            <div>
+              <Paragraph>{it.summary}</Paragraph>
+              {it.strengths?.length > 0 && <div><b>Strengths:</b> {it.strengths.join(" · ")}</div>}
+              {it.improvements?.length > 0 && <div style={{ marginBottom: 10 }}><b>To improve:</b> {it.improvements.join(" · ")}</div>}
+              {(it.answers || []).map((a, i) => (
+                <Card type="inner" key={i} style={{ marginBottom: 8 }} size="small">
+                  <b>Q{i + 1} ({a.difficulty}, {a.topic}): {a.question}</b>
+                  <div style={{ margin: "6px 0", whiteSpace: "pre-wrap" }}>{a.answer === "[no answer]" ? <i>No answer</i> : a.answer}</div>
+                  <Tag color={a.score >= 71 ? "green" : a.score >= 41 ? "orange" : "red"}>{a.score}/100</Tag>
+                  <Text type="secondary">{a.feedback}</Text>
+                  {a.missed_points?.length > 0 && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>Missed: {a.missed_points.join("; ")}</div>}
+                </Card>
+              ))}
+            </div>
+          ),
+        }))} />
+      )}
+      <Popconfirm title="Remove this candidate and their interviews?" onConfirm={() => dispatch(removeCandidate(c.id))}>
+        <Button danger size="small" style={{ marginTop: 12 }}>Remove candidate</Button>
+      </Popconfirm>
+    </div>
+  );
 
-      <Card className="panel-card" bordered={false} style={{ marginBottom: 18 }}>
-        {rows.length === 0 ? (
-          <Empty description="No candidates" />
-        ) : (
-          <Table dataSource={rows} columns={columns} rowKey="id" pagination={{ pageSize: 8 }} />
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
+        <Text type="secondary">Candidates ranked by best score. Search by name, email or skill.</Text>
+        <Input.Search placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: 320 }} allowClear />
+      </div>
+      <Card className="panel-card" variant="borderless">
+        {rows.length === 0 ? <Empty description="No candidates yet — run an interview first" /> : (
+          <Table dataSource={rows} columns={columns} rowKey="id" pagination={{ pageSize: 8 }} expandable={{ expandedRowRender: detail }} />
         )}
       </Card>
-
-      <Title level={5}>Detailed candidate cards</Title>
-      <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-        {rows.map((c) => {
-          const topScore = c.topScore !== null && c.topScore !== undefined ? Math.max(0, Math.min(100, Math.round(c.topScore))) : null;
-          // show interviews newest-first but label sessions 1..N (1 = most recent)
-          const interviewsReversed = (c.interviews || []).slice().reverse();
-
-          return (
-            <Card key={c.id} className="candidate-card">
-              <div style={{ width: 72 }}>
-                <div
-                  style={{
-                    height: 56,
-                    width: 56,
-                    borderRadius: 8,
-                    background: "linear-gradient(90deg,#7c3aed22,#2563eb22)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#fff",
-                    fontWeight: 800,
-                    fontSize: 18,
-                  }}
-                >
-                  {(c.name || "?").slice(0, 1).toUpperCase()}
-                </div>
-              </div>
-
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 800 }}>{c.name}</div>
-                    <div style={{ color: "#6b7280", fontSize: 13 }}>
-                      {c.email} • {c.phone || "-"}
-                    </div>
-                    <div style={{ marginTop: 8, color: "#6b7280" }}>
-                      {(c.resumeText || "").slice(0, 220)}
-                      {(c.resumeText || "").length > 220 ? "…" : ""}
-                    </div>
-                  </div>
-
-                  <div style={{ minWidth: 140, textAlign: "center" }}>
-                    <div style={{ fontSize: 12, color: "#6b7280" }}>Best score</div>
-                    <div style={{ fontSize: 20, fontWeight: 800 }}>{topScore ?? "-"}</div>
-                    <div style={{ marginTop: 8 }}>
-                      <Progress percent={topScore ?? 0} size="small" />
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: 12 }}>
-                  {!interviewsReversed.length ? (
-                    <div style={{ color: "#6b7280" }}>No interviews yet</div>
-                  ) : (
-                    <Collapse accordion>
-                      {interviewsReversed.map((it, idx) => {
-                        // idx 0 is most recent -> label Session 1
-                        const sessionNumber = idx + 1;
-                        const score = typeof it.finalScore === "number" ? Math.max(0, Math.min(100, Math.round(it.finalScore))) : "-";
-                        return (
-                          <Panel
-                            key={it.sessionId || `${c.id}-${idx}`}
-                            header={
-                              <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-                                <div>Session {sessionNumber}</div>
-                                <div>{score} / 100</div>
-                              </div>
-                            }
-                          >
-                            <div style={{ marginBottom: 8 }}>
-                              <strong>Summary:</strong> {it.summary || "-"}
-                            </div>
-
-                            {(it.questions || []).map((q, qi) => {
-                              const ans = (it.answers || []).find((a) => a.questionId === q.id) || {};
-                              const ansScore = typeof ans.rating?.score === "number" ? Math.max(0, Math.min(100, Math.round(ans.rating.score))) : null;
-                              return (
-                                <Card type="inner" key={q.id} style={{ marginBottom: 12 }}>
-                                  <div style={{ fontWeight: 700 }}>Q{qi + 1} ({q.difficulty}): {q.text}</div>
-
-                                  <div style={{ marginTop: 8 }}>
-                                    <strong>Expected:</strong>
-                                    <ul style={{ marginTop: 6 }}>
-                                      {(q.expected_points || []).map((p, i) => (
-                                        <li key={i} style={{ fontSize: 13 }}>{p}</li>
-                                      ))}
-                                    </ul>
-                                  </div>
-
-                                  <div style={{ marginTop: 8 }}>
-                                    <strong>Answer:</strong>
-                                    <div style={{ marginTop: 6, color: "#111" }}>{ans.text || "(none)"}</div>
-                                  </div>
-
-                                  <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 12 }}>
-                                    <div><strong>Rating:</strong></div>
-                                    <Tag
-                                      color={ansScore === null ? "default" : (ansScore >= 86 ? "green" : ansScore >= 71 ? "blue" : ansScore >= 41 ? "orange" : "red")}
-                                    >
-                                      {ansScore ?? "-"} / 100
-                                    </Tag>
-                                    <div style={{ color: "#6b7280", marginLeft: 8 }}><strong>Feedback:</strong> {ans.rating?.feedback || "-"}</div>
-                                  </div>
-                                </Card>
-                              );
-                            })}
-                          </Panel>
-                        );
-                      })}
-                    </Collapse>
-                  )}
-                </div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
     </div>
   );
 }

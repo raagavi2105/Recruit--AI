@@ -2,64 +2,24 @@
 "use client";
 
 import React from "react";
-import { Row, Col, Card, Tabs, Typography } from "antd";
-import ResumeUploader from "../components/ResumeUploader";
-import InterviewChat from "../components/InterviewChat";
+import { Tabs, Typography } from "antd";
+import InterviewStudio from "../components/InterviewStudio";
 import Dashboard from "../components/Dashboard";
 
 const { Title, Text } = Typography;
 
 export default function Home() {
   const items = [
-    {
-      key: "interview",
-      label: "Interviewee (Chat)",
-      children: (
-        <Row gutter={[20, 20]}>
-          <Col xs={24}>
-            <Card className="hero-card" bordered={false}>
-              <div className="hero-content">
-                <div>
-                  <Title level={2} className="hero-title">RecruitAI- an AI Interview Assistant</Title>
-                  <Text type="secondary" className="hero-sub">Next-generation interview experience for developers — fast, fair, focused.</Text>
-                </div>
-                <div>
-                  <button className="primary-cta" onClick={() => document.querySelector("#interview-panel")?.scrollIntoView({ behavior: "smooth" })}>
-                    Start an interview
-                  </button>
-                </div>
-              </div>
-            </Card>
-          </Col>
-
-          <Col xs={24} lg={7}>
-            <Card className="panel-card" bordered={false}>
-              <h3 className="panel-title">Resume Upload</h3>
-              <ResumeUploader />
-            </Card>
-          </Col>
-
-          <Col xs={24} lg={17}>
-            <Card id="interview-panel" className="panel-card large" bordered={false}>
-              <InterviewChat />
-            </Card>
-          </Col>
-        </Row>
-      )
-    },
-    {
-      key: "dashboard",
-      label: "Interviewer (Dashboard)",
-      children: (
-        <div>
-          <Dashboard />
-        </div>
-      )
-    }
+    { key: "interview", label: "Interview Studio", children: <InterviewStudio /> },
+    { key: "dashboard", label: "Recruiter Dashboard", children: <Dashboard /> },
   ];
 
   return (
-    <div style={{ padding: 28 }}>
+    <div style={{ padding: "24px 28px", maxWidth: 1280, margin: "0 auto" }}>
+      <div style={{ marginBottom: 8 }}>
+        <Title level={2} className="hero-title" style={{ marginBottom: 4 }}>RecruitAI</Title>
+        <Text type="secondary">Upload a resume, pick a role, and get a tailored, AI-graded interview with a full report.</Text>
+      </div>
       <Tabs defaultActiveKey="interview" items={items} />
     </div>
   );
